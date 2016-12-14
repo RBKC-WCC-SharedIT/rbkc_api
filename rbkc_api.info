@@ -1,0 +1,7 @@
+name = RBKC API
+description = Custom API services for the Services module
+core = 7.x
+package = RBKC
+
+dependencies[] = services
+dependencies[] = rbkc_api_queue

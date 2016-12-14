@@ -1,0 +1,9 @@
+<?php
+
+/**
+ * hook_install()
+ */
+function rbkc_api_install() {
+  rbkc_api_create_api_user();
+}
+

@@ -1,0 +1,137 @@
+<?php
+
+function rbkc_api_services_resources() {
+  $resources = array(
+    'needs-review' => array(
+      'operations' => array(
+        'index' => array(
+          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
+          'callback' => '_rbkc_api_needs_review_retrieve',
+          'access arguments' => array('access content'),
+          'args' => array(
+            array(
+              'name' => 'site',
+              'optional' => TRUE,
+              'source' => array('param' => 'site'),
+              'description' => t('The microsite name'),
+              'type' => 'string',
+            ),
+          ),
+        ),
+      ),
+    ),
+    'rbkc-user' => array(
+      'operations' => array(
+        
+        'create' => array(
+          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
+          'callback' => '_rbkc_api_user_create',
+          'access arguments' => array('administer users'),
+          'args' => array(
+            array(
+              'name' => 'user_data',
+              'optional' => false,
+              'source' => 'data',
+              'description' => 'Data sent through the REST call',
+              'type' => 'array',
+            ),
+          ),
+          'help' => t('Creates a new user on this site.'),
+        ),
+
+//        'update' => array(
+//          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
+//          'callback' => '_rbkc_api_user_update',
+//          'access arguments' => array('administer users'),
+//          'access arguments append' => false,
+//          'args' => array(
+//            array(
+//              'name' => 'user_data',
+//              'optional' => false,
+//              'source' => 'data',
+//              'description' => 'Data sent through the REST call',
+//              'type' => 'array',
+//            ),
+//          ),
+//          'help' => t('Update an existing user profile.'),
+//        ),
+        
+        'update' => array(
+          'help' => 'Update a user',
+          'callback' => '_rbkc_api_user_update',
+          'args' => array(
+            array(
+              'name' => 'name',
+              'optional' => FALSE,
+              'source' => array('path' => 0),
+              'description' => 'The username of the user to update.',
+              'type' => 'string',
+            ),
+            array(
+              'name' => 'data',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => 'The up-to-date user profile data',
+              'type' => 'array',
+            ),
+          ),
+          'access arguments' => array('administer users'),
+          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
+        ),
+      
+      ),
+    ),
+  );
+  
+  return $resources;
+}
+
+/**
+ * Returns true if a user with $username and $email already exist
+ * @param $username
+ * @param $email
+ * @return boolean
+ */
+function rbkc_api_user_exists($username, $email) {
+  $sql = 'SELECT uid FROM users WHERE name = :name AND mail = :mail LIMIT 1';
+  $result = db_query($sql, array(':name' => $username, ':mail' => $email))->fetchfield();
+  return $result? $result : false;
+}
+
+function rbkc_api_form_user_profile_form_alter(&$form, &$form_state) {
+  // replace the default user cancel submit handler with our own
+  $submit_handler_key = array_search('user_edit_cancel_submit', $form['actions']['cancel']['#submit']);
+  if ($submit_handler_key !== false) {
+    $form['actions']['cancel']['#submit'][$submit_handler_key] = 'rbkc_api_user_cancel';
+  }
+}
+
+function rbkc_api_user_cancel($form, &$form_state) {
+  if ($form_state['user']->name == 'api_user') {
+    form_set_error('name', t('You are not allowed to delete the user "api_user". It is required for the RBKC Dashboard to work.'));
+  } else {
+    user_edit_cancel_submit($form, $form_state);
+  }
+}
+
+function rbkc_api_create_api_user() {
+  // Create a new user with username "api_user" with admin role
+  $password = user_password(10);
+  $admin_rid = array_search('administrator', user_roles());
+  
+  //set up the user fields
+  $fields = array(
+    'name' => 'api_user',
+    'mail' => 'api_user@rbkc.gov.uk',
+    'pass' => $password,
+    'status' => 1,
+    'init' => 'api_user@rbkc.gov.uk',
+    'roles' => array(
+      DRUPAL_AUTHENTICATED_RID => 'authenticated user',
+      $admin_rid => 'administrator',
+    ),
+  );
+  
+  user_save('', $fields);
+}
+
