@@ -63,6 +63,22 @@ function _rbkc_api_user_update($username, $user_data) {
   return 'Queued user update for: '.$user_data['username'].' <'.$user_data['email'].'>';
 }
 
+function _rbkc_api_user_revoke($user_data) {
+  $q_item = array(
+    'worker_include_file' => array(
+      'type' => 'inc',
+      'module' => 'rbkc_api',
+      'name' => 'resources/rbkc_api_resources',
+    ),
+    'worker_callback' => 'rbkc_api_user_revoke_queue_worker',
+    'requester_uid' => isset($user_data['requester_uid'])? $user_data['requester_uid'] : RBKC_API_DEFAULT_REQUESTER_UID,
+    'request_data' => $user_data,
+  );
+  drupal_alter('rbkc_api_queue_item', $q_item);
+  rbkc_api_queue_add($q_item);
+  return 'Queued user revoke for: '.$user_data['username'].' <'.$user_data['email'].'>';
+}
+
 /********************************/
 
 /**
@@ -141,6 +157,9 @@ function rbkc_api_user_update_queue_worker($item) {
   }
 }
 
+function rbkc_api_user_revoke_queue_worker($item) {
+  watchdog('rbkc_api_user_revoke_queue_worker', '$item: '.print_r($item, true));
+}
 
 /**
  * Translates an array of rol names into array of rid => role_name

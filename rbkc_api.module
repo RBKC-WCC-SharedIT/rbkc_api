@@ -19,10 +19,13 @@ function rbkc_api_services_resources() {
           ),
         ),
       ),
-    ),
+    ), // needs-review
+    
+    
     'rbkc-user' => array(
       'operations' => array(
-        
+
+        /* CREATE USER ACCOUNT */
         'create' => array(
           'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
           'callback' => '_rbkc_api_user_create',
@@ -37,25 +40,9 @@ function rbkc_api_services_resources() {
             ),
           ),
           'help' => t('Creates a new user on this site.'),
-        ),
-
-//        'update' => array(
-//          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
-//          'callback' => '_rbkc_api_user_update',
-//          'access arguments' => array('administer users'),
-//          'access arguments append' => false,
-//          'args' => array(
-//            array(
-//              'name' => 'user_data',
-//              'optional' => false,
-//              'source' => 'data',
-//              'description' => 'Data sent through the REST call',
-//              'type' => 'array',
-//            ),
-//          ),
-//          'help' => t('Update an existing user profile.'),
-//        ),
-        
+        ), // create
+         
+        /* UPDATE USER ACCOUNT */
         'update' => array(
           'help' => 'Update a user',
           'callback' => '_rbkc_api_user_update',
@@ -77,10 +64,39 @@ function rbkc_api_services_resources() {
           ),
           'access arguments' => array('administer users'),
           'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
-        ),
+        ), // update
       
-      ),
-    ),
+      ), // operations
+  
+      'actions' => array(
+        
+        /* Revoke access to site */
+        'revoke' => array(
+          'help' => 'Revoke user\'s access to site',
+          'callback' => '_rbkc_api_user_revoke',
+          'file' => array('type' => 'inc', 'module' => 'rbkc_api', 'name' => 'resources/rbkc_api_resources'),
+          'access arguments' => array('administer users'),
+          'args' => array(
+//            array(
+//              'name' => 'name',
+//              'optional' => FALSE,
+//              'source' => array('path' => 0),
+//              'description' => 'The username of the user to update.',
+//              'type' => 'string',
+//            ),
+            array(
+              'name' => 'data',
+              'optional' => FALSE,
+              'source' => 'data',
+              'description' => "Params: 1. 'target_site' => string (the target site key), 2. 'domains' => array[string] (For domain access instances only, list the site keys of the domains to revoke access to). ",
+              'type' => 'array',
+            ),
+          ),
+        ), // revoke
+        
+      ), // targeted_actions
+      
+    ), // rbkc-user
   );
   
   return $resources;
