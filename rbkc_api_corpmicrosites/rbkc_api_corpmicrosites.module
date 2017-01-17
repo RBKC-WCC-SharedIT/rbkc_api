@@ -1,14 +1,5 @@
 <?php
 
-// function rbkc_api_corpmicrosites_rbkc_api_queue_item_alter(&$queue_item) {
-// 	watchdog('rbkc_api_hook', '_rbkc_api_queue_item_alter q item: '.print_r($queue_item, true));
-// }
-
-// function rbkc_api_corpmicrosites_rbkc_api_user_pre_create($data, $queue_item) {
-	// watchdog('rbkc_api_hook', '_rbkc_api_user_pre_create: '.print_r($data, true));
-	// watchdog('rbkc_api_hook', '_rbkc_api_user_pre_create q item: '.print_r($queue_item, true));
-// }
-
 /**
  * Implementation of hook_needs_review_callback_alter
  */
