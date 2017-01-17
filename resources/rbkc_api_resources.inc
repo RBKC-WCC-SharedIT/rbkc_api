@@ -159,6 +159,24 @@ function rbkc_api_user_update_queue_worker($item) {
 
 function rbkc_api_user_revoke_queue_worker($item) {
   watchdog('rbkc_api_user_revoke_queue_worker', '$item: '.print_r($item, true));
+  if (!isset($item['request_data']['target_username'])) {
+    watchdog('rbkc_api', 'User revoke request ignored. Username not provided. Queue item dump: '.print_r($item, true));
+    return true;
+  }
+  
+  $username = $item['request_data']['target_username'];
+  $target_user = user_load_by_name($username);
+  
+  if ($target_user === false) {
+    watchdog('rbkc_api', 'User revoke request ignored. Username "'.$username.'" not found in database. Queue item dump: '.print_r($item, true));
+    return true;
+  }
+  
+  // Blocked status is 0
+  user_save($target_user, array('status' => 0));
+  watchdog('rbkc_api', 'Revoked access for username "'.$username.'". Queue item dump: '.print_r($item, true));
+  
+  return true;
 }
 
 /**
