@@ -88,33 +88,65 @@ function _rbkc_api_user_revoke($user_data) {
  * @return null
  */
 function rbkc_api_user_create_queue_worker($item) {
-  if (rbkc_api_user_exists($item['request_data']['username'], $item['request_data']['email'])) {
-    watchdog('rbkc_api_user_create_queue_worker', 'Inbound REST create-user request ignored because user already exist, for username '.$item['request_data']['username'].' with email '.$item['request_data']['email']);
+  
+  $target_user = user_load_by_name($item['request_data']['username']);
+  
+  if ($target_user) {
+    
+    // Call hook_rbkc_api_user_pre_unblock
+    module_invoke_all('rbkc_api_user_pre_unblock', $target_user, $item);
+    rbkc_api_user_unblock($target_user);
+    // Call hook_rbkc_api_user_post_block for post-save
+    module_invoke_all('rbkc_api_user_post_unblock', $target_user, $item);
     return true;
+    
+  } else {
+    
+    // Call hook_rbkc_api_user_pre_create for pre-save
+    module_invoke_all('rbkc_api_user_pre_create', $item);
+    $account = _rbkc_api_user_create_helper($item);
+    // Call hook_rbkc_api_user_pre_create for post-save
+    module_invoke_all('rbkc_api_user_post_create', $account, $item);
+    return true;
+    
   }
   
-	$fields = array(
-		'name' => $item['request_data']['username'],
-		'mail' => $item['request_data']['email'],
-		'pass' => user_password(8),
-		'status' => 1,
-		'init' => 'email_address',
-		'roles' => _rbkc_api_get_roles($item['request_data']['roles']),
-		'field_full_name' => array(
-			LANGUAGE_NONE => array(
-				0 => array('value' => $item['request_data']['fullname']),
-			),
-		),
-		'data' => array('creator_uid' => $item['requester_uid']),		
-	);
+}
+
+/**
+ * Helper function to create a new user
+ * @param array $queue_item The queue item for the user-create request
+ * @return \stdClass
+ */
+function _rbkc_api_user_create_helper($queue_item) {
+  $fields = array(
+    'name' => $queue_item['request_data']['username'],
+    'mail' => $queue_item['request_data']['email'],
+    'pass' => user_password(8),
+    'status' => 1,
+    'init' => 'email_address',
+    'roles' => _rbkc_api_get_roles($queue_item['request_data']['roles']),
+    'field_full_name' => array(
+      LANGUAGE_NONE => array(
+        0 => array('value' => $queue_item['request_data']['fullname']),
+      ),
+    ),
+    'data' => array('creator_uid' => $queue_item['requester_uid']),
+  );
   
-	// Call hook_rbkc_api_user_pre_create for pre-save 
-	module_invoke_all('rbkc_api_user_pre_create', $fields, $item);
+  $account = user_save(null, $fields);
+  
+  return $account;
+}
 
-	$account = user_save(null, $fields);
 
-	// Call hook_rbkc_api_user_pre_create for post-save 
-	module_invoke_all('rbkc_api_user_post_create', $account, $item);
+/**
+ * Unblock a user
+ * @param $user
+ */
+function rbkc_api_user_unblock($user) {
+  user_save($user, array('status' => 1));
+  watchdog('rbkc_api', 'Unblocked username '.$user->name);
 }
 
 /**
@@ -122,6 +154,7 @@ function rbkc_api_user_create_queue_worker($item) {
  * is being picked up from the queue and processed.
  * @param array $item The queue item being processed.
  * @return null
+ * @throws \APIUserNotFoundException
  */
 function rbkc_api_user_update_queue_worker($item) {
   if (!isset($item['request_data']['target_username'])) {
@@ -173,8 +206,10 @@ function rbkc_api_user_revoke_queue_worker($item) {
   }
   
   // Blocked status is 0
-  user_save($target_user, array('status' => 0));
-  watchdog('rbkc_api', 'Revoked access for username "'.$username.'". Queue item dump: '.print_r($item, true));
+  if ($target_user->status != 0) {
+    user_save($target_user, array('status' => 0));
+    watchdog('rbkc_api', 'Revoked access for username "'.$username.'". Queue item dump: '.print_r($item, true));
+  }
   
   return true;
 }
