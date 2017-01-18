@@ -194,7 +194,7 @@ function rbkc_api_user_update_queue_worker($item) {
     throw new APIUserNotFoundException('Received API request update user '.$target_username.' but username is not found.');
   }
   
-  $save_data = _rbkc_api_create_usersave_data($update_data['request_data']);
+  $save_data = _rbkc_api_create_usersave_data($item['request_data']);
   
   if ($save_data) {
     user_save($target_user_obj, $save_data);
