@@ -95,7 +95,7 @@ function rbkc_api_user_create_queue_worker($item) {
     
     // Call hook_rbkc_api_user_pre_unblock
     module_invoke_all('rbkc_api_user_pre_unblock', $target_user, $item);
-    rbkc_api_user_unblock($target_user);
+    rbkc_api_user_unblock($target_user, $item['request_data']);
     // Call hook_rbkc_api_user_post_block for post-save
     module_invoke_all('rbkc_api_user_post_unblock', $target_user, $item);
     return true;
@@ -119,33 +119,59 @@ function rbkc_api_user_create_queue_worker($item) {
  * @return \stdClass
  */
 function _rbkc_api_user_create_helper($queue_item) {
-  $fields = array(
-    'name' => $queue_item['request_data']['username'],
-    'mail' => $queue_item['request_data']['email'],
+  $fields1 = _rbkc_api_create_usersave_data($queue_item['request_data']);
+  
+  $fields2 = array(
     'pass' => user_password(8),
     'status' => 1,
-    'init' => 'email_address',
-    'roles' => _rbkc_api_get_roles($queue_item['request_data']['roles']),
-    'field_full_name' => array(
-      LANGUAGE_NONE => array(
-        0 => array('value' => $queue_item['request_data']['fullname']),
-      ),
-    ),
-    'data' => array('creator_uid' => $queue_item['requester_uid']),
+    'init' => $queue_item['request_data']['mail'],
   );
+
+  $fields = $fields1 + $fields2;
   
   $account = user_save(null, $fields);
   
   return $account;
 }
 
+/**
+ * Creates an array of user profile data into data for user_save()
+ * @param $source_data
+ * @return array
+ */
+function _rbkc_api_create_usersave_data($source_data) {
+  $userdata = array();
+  foreach ($source_data as $field => $value) {
+    switch ($field) {
+      case 'fullname':
+        $userdata['field_full_name'][LANGUAGE_NONE][0]['value'] = $value;
+        break;
+      case 'username':
+        $userdata['name'] = $value;
+        break;
+      case 'email':
+        $userdata['mail'] = $value;
+        break;
+      case 'roles':
+        $userdata['roles'] = _rbkc_api_get_roles($value);
+        break;
+      case 'status':
+        $userdata['status'] = $value;
+        break;
+    }
+  }
+  return $userdata;
+}
 
 /**
  * Unblock a user
- * @param $user
+ * @param object $user
+ * @param array $update_data
  */
-function rbkc_api_user_unblock($user) {
-  user_save($user, array('status' => 1));
+function rbkc_api_user_unblock($user, $update_data = null) {
+  $user_data = _rbkc_api_create_usersave_data($update_data);
+  $user_data['status'] = 1;
+  user_save($user, $user_data);
   watchdog('rbkc_api', 'Unblocked username '.$user->name);
 }
 
@@ -167,24 +193,9 @@ function rbkc_api_user_update_queue_worker($item) {
   if (empty($target_user_obj)) {
     throw new APIUserNotFoundException('Received API request update user '.$target_username.' but username is not found.');
   }
-
-  $save_data = array();
-  foreach ($item['request_data'] as $field => $value) {
-    switch ($field) {
-      case 'fullname':
-        $save_data['field_full_name'][LANGUAGE_NONE][0]['value'] = $value;
-        break;
-      case 'name':
-        $save_data['name'] = $value;
-        break;
-      case 'mail':
-        $save_data['mail'] = $value;
-        break;
-      case 'status':
-        $save_data['status'] = $value;
-        break;
-    }
-  }
+  
+  $save_data = _rbkc_api_create_usersave_data($update_data['request_data']);
+  
   if ($save_data) {
     user_save($target_user_obj, $save_data);
   }
