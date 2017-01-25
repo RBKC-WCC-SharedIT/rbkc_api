@@ -32,60 +32,63 @@ function rbkc_api_corpmicrosites_needs_review_count($sitename) {
  * Implementation of hook_rbkc_api_user_post_create()
  */
 function rbkc_api_corpmicrosites_rbkc_api_user_post_create($user, $queue_item) {
-	
-	// If the REST request did not provide a domain name, stop processing
-	if (!isset($queue_item['request_data']['domains'])) {
-		return;
-	}
-
-	$requested_domains = $queue_item['request_data']['domains'];
-	$requested_domain_ids = _rbkc_api_corpmicrosites_path_ids($requested_domains);
-	
-	// If the domain in the REST request doesn't exist in this site, stop
-	if (empty($requested_domain_ids)) {
-		return;
-	}
-	
-	/** Give user access to the required Domain Access domains... **/
-	
-	$user_domains = array();
-	foreach ($requested_domain_ids as $domain_id => $domain_path) {
-		$user_domains[$domain_id] = $domain_id;
-	}
-	$domain_user_values = array('domain_user' => $user_domains);
-	domain_user_save($domain_user_values, $user, '');
-
-	/** Set the appropriate user roles for each domain... **/
-	
-	// We're doing this by calling the sorm submit handler
-  // for subfolders_domain_roles_form()
-  
-  // Get all the relevant domains for this user to access
-  $form_values_domain_ids = array();
-  foreach ($user_domains as $key => $domain_id) {
-    $form_values_domain_ids[$domain_id] = 1;
+  // If the REST request did not provide a domain name, stop processing
+  if (!isset($queue_item['request_data']['domains'])) {
+    return;
   }
+  
+  $requested_domain_ids = _rbkc_api_corpmicrosites_domain_paths2ids($queue_item['request_data']['domains']);
+  
+  // If the domain in the REST request doesn't exist in this site, stop
+  if (empty($requested_domain_ids)) {
+    return;
+  }
+  
+  rbkc_api_microsites_grant_domains($user, array_keys($requested_domain_ids));
+}
 
+
+
+/**
+ * Grant a user access to a list of domains
+ * @param object $user The user object for the user to grant access to
+ * @param array $domain_ids Array of Domain IDs to grant access for
+ */
+function rbkc_api_microsites_grant_domains($user, $domain_ids) {
+  if (isset($user->domain_user)) {
+    $domain_ids += $user->domain_user;
+  }
+  
+  /**
+   * Allow access to domains
+   */
+  
+  $grant_domain_ids = array('domain_user' => array_combine($domain_ids, $domain_ids));
+  domain_user_save($grant_domain_ids, $user, '');
+  
+  /**
+   * Grant subfolder domain permissions. We're doing this by calling the
+   * form submit handler for subfolders_domain_roles_form()
+   */
+  
   // For each role assigned to this user, let the user have that
-  // role in each of her domains. We initilaise this array
+  // role in all of her domains. We initialise this array
   // with the user's user_id because the form
   // submit handler needs this uid.
   $form_values_roles_domains = array(0 => array('all' => $user->uid));
-  
   foreach ($user->roles as $rid => $role_name) {
-    $form_values_roles_domains[$rid] = $form_values_domain_ids;
+    $form_values_roles_domains[$rid] = array('all' => 1);
   }
   
-  // Format the form_state array to pass to
-  // the form submit handler
+  // Format the form_state array to pass to the form submit handler
   $form_values = array('values' => array(
-      'subfolders_domain_role' => $form_values_roles_domains,
+    'subfolders_domain_role' => $form_values_roles_domains,
   ));
   
   // Call subfolders_roles admin form submit handler
   module_load_include('inc', 'subfolders_domain', 'subfolders_domain.admin');
   subfolders_domain_roles_form_submit(array(), $form_values);
-  
+
 // For ref, form values should be like the following example
 //  $form_values = array(
 //    'values' => array(
@@ -94,24 +97,11 @@ function rbkc_api_corpmicrosites_rbkc_api_user_post_create($user, $queue_item) {
 //          'all' => $user->uid,  // the form submit handler needs this uid
 //        ),
 //        5 => array(  // 5 is the rid
-//          17 => 1,   // 17 is a domain_id
-//          18 => 1,   // 1 means apply this role to this domain
+//          'all' => 1,   // Assign this role to all domains granted to user
 //        )
 //      )
 //    )
 //  );
-
-}
-
-/**
- * Returns list of domains and the given user's roles in each site
- * @param $user User object
- * @return array(site_id => role_name)
- */
-function _rbkc_api_corpmicrosites_subfolder_roles($user) {
-  $all_subfolders_roles = variable_get('subfolders_domain_roles', array());
-  
-  return array();
 }
 
 
@@ -147,4 +137,27 @@ function rbkc_api_corpmicrosites_get_all_domains() {
 		}
 	}
 	return $ids_paths;
+}
+
+
+function _rbkc_api_corpmicrosites_domain_paths2ids($domain_paths) {
+  static $domains = array();
+  
+  if (empty($domains)) {
+    $domains_paths = db_select('subfolders_domain_sites', 'd')->fields('d')->execute();
+    if (!empty($domains_paths)) {
+      foreach ($domains_paths as $domain_path) {
+        $domains[$domain_path->domain_id] = $domain_path->site;
+      }
+    }
+  }
+  
+  $result = array();
+  foreach ($domains as $domain_id => $domain_path) {
+    if (in_array($domain_path, $domain_paths)) {
+      $result[$domain_id] = $domain_path;
+    }
+  }
+  
+  return $result;
 }

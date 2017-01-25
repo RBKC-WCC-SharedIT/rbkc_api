@@ -38,7 +38,7 @@ function _rbkc_api_user_create($user_data) {
 			'name' => 'resources/rbkc_api_resources',
 		),
 		'worker_callback' => 'rbkc_api_user_create_queue_worker',
-		'requester_uid' => $user->uid,
+    'requester_uid' => isset($user_data['requester_uid'])? $user_data['requester_uid'] : RBKC_API_DEFAULT_REQUESTER_UID,
 		'request_data' => $user_data,
 	);
 	drupal_alter('rbkc_api_queue_item', $q_item);
@@ -83,7 +83,8 @@ function _rbkc_api_user_revoke($user_data) {
 
 /**
  * User create callback. This is run when an incoming user-create request
- * is being picked up from the queue and processed.
+ * is being picked up from the queue and processed. If user exists, then
+ * unblock the user account, instead of creating it.
  * @param array $item The queue item being processed.
  * @return null
  */
