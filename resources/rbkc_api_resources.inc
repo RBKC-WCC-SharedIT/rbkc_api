@@ -90,27 +90,23 @@ function _rbkc_api_user_revoke($user_data) {
  */
 function rbkc_api_user_create_queue_worker($item) {
   
+  module_invoke_all('rbkc_api_user_pre_create', $item);
+  
   $target_user = user_load_by_name($item['request_data']['username']);
   
   if ($target_user) {
-    
-    // Call hook_rbkc_api_user_pre_unblock
-    module_invoke_all('rbkc_api_user_pre_unblock', $target_user, $item);
-    rbkc_api_user_unblock($target_user, $item['request_data']);
-    // Call hook_rbkc_api_user_post_block for post-save
-    module_invoke_all('rbkc_api_user_post_unblock', $target_user, $item);
-    return true;
-    
+    if ($target_user->status == 0) {
+      rbkc_api_user_unblock($target_user, $item['request_data']);
+    }
+    $usermode = RBKC_API_EXISTING_USER;
   } else {
-    
-    // Call hook_rbkc_api_user_pre_create for pre-save
-    module_invoke_all('rbkc_api_user_pre_create', $item);
-    $account = _rbkc_api_user_create_helper($item);
-    // Call hook_rbkc_api_user_pre_create for post-save
-    module_invoke_all('rbkc_api_user_post_create', $account, $item);
-    return true;
-    
+    $target_user = _rbkc_api_user_create_helper($item);
+    $usermode = RBKC_API_NEW_USER;
   }
+  
+  module_invoke_all('rbkc_api_user_post_create', $target_user, $item, $usermode);
+  
+  return true;
   
 }
 

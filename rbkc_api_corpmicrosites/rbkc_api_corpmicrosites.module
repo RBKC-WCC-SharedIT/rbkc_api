@@ -31,40 +31,46 @@ function rbkc_api_corpmicrosites_needs_review_count($sitename) {
 /**
  * Implementation of hook_rbkc_api_user_post_create()
  */
-function rbkc_api_corpmicrosites_rbkc_api_user_post_create($user, $queue_item) {
+function rbkc_api_corpmicrosites_rbkc_api_user_post_create($user, $queue_item, $usermode) {
   // If the REST request did not provide a domain name, stop processing
   if (!isset($queue_item['request_data']['domains'])) {
     return;
   }
   
-  $requested_domain_ids = _rbkc_api_corpmicrosites_domain_paths2ids($queue_item['request_data']['domains']);
+  $requested_domains = _rbkc_api_corpmicrosites_domain_paths2ids($queue_item['request_data']['domains']);
   
   // If the domain in the REST request doesn't exist in this site, stop
-  if (empty($requested_domain_ids)) {
+  if (empty($requested_domains)) {
     return;
   }
   
-  rbkc_api_microsites_grant_domains($user, array_keys($requested_domain_ids));
+  $domain_ids = array_keys($requested_domains);
+  if (isset($user->domain_user)) {
+    $domain_ids += $user->domain_user;
+  }
+  
+  // Allow user to access domains, managed by Domain Access module.
+  $grant_domain_ids = array('domain_user' => array_combine($domain_ids, $domain_ids));
+  domain_user_save($grant_domain_ids, $user, '');
+  
+  // If this is a new user, also specify finer grained role-based access
+  // to the domains, managed by Subfolder Domains.
+  if ($usermode == RBKC_API_NEW_USER) {
+    rbkc_api_microsites_subfolder_perms($user, $domain_ids);
+  }
 }
 
 
 
 /**
- * Grant a user access to a list of domains
+ * Grant user's roles to domains
  * @param object $user The user object for the user to grant access to
  * @param array $domain_ids Array of Domain IDs to grant access for
  */
-function rbkc_api_microsites_grant_domains($user, $domain_ids) {
+function rbkc_api_microsites_subfolder_perms($user, $domain_ids) {
   if (isset($user->domain_user)) {
     $domain_ids += $user->domain_user;
   }
-  
-  /**
-   * Allow access to domains
-   */
-  
-  $grant_domain_ids = array('domain_user' => array_combine($domain_ids, $domain_ids));
-  domain_user_save($grant_domain_ids, $user, '');
   
   /**
    * Grant subfolder domain permissions. We're doing this by calling the
@@ -85,9 +91,12 @@ function rbkc_api_microsites_grant_domains($user, $domain_ids) {
     'subfolders_domain_role' => $form_values_roles_domains,
   ));
   
+  $form_values['values']['op'] = 'Save configuration';
+  
   // Call subfolders_roles admin form submit handler
   module_load_include('inc', 'subfolders_domain', 'subfolders_domain.admin');
-  subfolders_domain_roles_form_submit(array(), $form_values);
+//  subfolders_domain_roles_form_submit(array(), $form_values);
+  drupal_form_submit('subfolders_domain_roles_form', $form_values);
 
 // For ref, form values should be like the following example
 //  $form_values = array(

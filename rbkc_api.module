@@ -1,4 +1,33 @@
 <?php
+define ('RBKC_API_EXISTING_USER', 'existing');
+define ('RBKC_API_NEW_USER', 'new');
+
+/**
+ * Implements hook_menu().
+ */
+function rbkc_api_menu() {
+  $items = array();
+  
+  $items['test'] = array(
+    'title' => 'Test',
+    'page callback' => 'rbkc_api_test',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+function rbkc_api_test() {
+  
+  $uid = 2237;
+  $user = user_load($uid);
+  
+  $grant_domain_ids = array('domain_user' => array(29 => 29, 39 => 39));
+  domain_user_save($grant_domain_ids, $user, '');
+  
+  return 'HELLO';
+}
 
 function rbkc_api_services_resources() {
   $resources = array(
