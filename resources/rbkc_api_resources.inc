@@ -192,6 +192,7 @@ function rbkc_api_user_update_queue_worker($item) {
   }
   
   $save_data = _rbkc_api_create_usersave_data($item['request_data']);
+  unset($save_data['name']); // Don't allow username to be changed
   
   if ($save_data) {
     user_save($target_user_obj, $save_data);
