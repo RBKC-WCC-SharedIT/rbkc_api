@@ -95,8 +95,7 @@ function rbkc_api_microsites_subfolder_perms($user, $domain_ids) {
   
   // Call subfolders_roles admin form submit handler
   module_load_include('inc', 'subfolders_domain', 'subfolders_domain.admin');
-//  subfolders_domain_roles_form_submit(array(), $form_values);
-  drupal_form_submit('subfolders_domain_roles_form', $form_values);
+  subfolders_domain_roles_form_submit(array(), $form_values);
 
 // For ref, form values should be like the following example
 //  $form_values = array(
